@@ -30,10 +30,7 @@ function getSimilarArtist(apiA, apiL, callback) {
 	request(apiRequest = apiURL+apiA+apiL, function (error, response, body) {
 		if (!error && response.statusCode == 200) {
 			
-			//TODO: We need to make a getUsabe for the artist names which returns
-			//		a list of the artists we can use. If the list is empty it means
-			//		we need a bigger set so we call the api again for double the original 
-			//		searh size. Or maybe less keep thinking about this.
+			//TODO: When there is 2 or less artists returned we get some issues
 			//		
 			//		This is going to have a lot of edge cases for returning not enough
 			//		similar artists if the artist is obscure and stuff so think about that too
@@ -46,6 +43,8 @@ function getSimilarArtist(apiA, apiL, callback) {
 			var count = Object.keys(body.similarartists.artist).length;
 			console.log("artists returned: "+count);
 
+
+			//makes a list of all artists which havent already been retrieved by API
 			for(i = 0; i < count; i++)
 			{
 				if(previousArtists.indexOf(similarartists[i].name) < 0)
@@ -59,8 +58,6 @@ function getSimilarArtist(apiA, apiL, callback) {
 			if(useableCount > 0){
 				randName = useableArtists[random(0,useableCount)];
 				console.log("name used: "+randName);
-			//console.log(randName);
-			//console.log(previousArtists.indexOf(randName));
 			
 			//these both set external values
 			artist = randName;
@@ -78,9 +75,6 @@ function getSimilarArtist(apiA, apiL, callback) {
 			limIncrementer++;
 			getSimilarArtist(apiArtist, "&limit="+limit*limIncrementer, callback);
 		}
-
-
-
 	}
 })
 }
@@ -89,3 +83,26 @@ function getSimilarArtist(apiA, apiL, callback) {
 function random(min, max) {
 	return Math.floor(Math.random() * (max - min + 1)) + min;
 }
+
+
+/* calling youtube api */
+
+function handleYoutubeResults(err, data) {
+	if( err instanceof Error) {
+		console.log(err);
+	}
+	else
+	{
+		for(var i = 0; i < data.items.length; i++)
+		{
+			console.log(data.items[i].id)
+			console.log(data.items[i].title)
+		}
+	}
+};
+
+var youtube = require('youtube-feeds');
+youtube.feeds.videos( {
+        q:              'Gorillaz',
+        'max-results':  2,
+    }, handleYoutubeResults)
