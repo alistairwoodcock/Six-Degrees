@@ -26,6 +26,14 @@ function getSimilarArtist(apiA, apiL, callback) {
 	request(apiRequest = apiURL+apiA+apiL, function (error, response, body) {
 		if (!error && response.statusCode == 200) {
 			
+			//TODO: We need to make a getUsabe for the artist names which returns
+			//		a list of the artists we can use. If the list is empty it means
+			//		we need a bigger set so we call the api again for double the original 
+			//		searh size. Or maybe less keep thinking about this.
+			//		
+			//		This is going to have a lot of edge cases for returning not enough
+			//		similar artists if the artist is obscure and stuff so think about that too
+
 			body = JSON.parse(body);
 
 			var count = Object.keys(body.similarartists.artist).length;
