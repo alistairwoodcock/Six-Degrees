@@ -19,15 +19,11 @@ io.sockets.on('connection', function (socket) {
 	previousArtistStorage[socket.id] = [];
 
 	socket.on('query', function (data) {
-		
-		var apiURL = "http://ws.audioscrobbler.com/2.0/?method=artist.getsimilar&autocorrect=1&api_key=97da75badf6d8defc793b60d004c5879&format=json";
-		var url = apiURL+"&limit=1&artist="+data;
+		similarArtistsAPICall(socket, data, 30);
+	});
 
-		request(url, function (error, response, body) {
-	    	if (!error && response.statusCode == 200) {
-	    		getSimilarArtist(socket, body);
-	    	}
-		});
+	socket.on('getYouTube', function(data) {
+		getTopTracks(socket, data);
 	});
 
 	socket.on('disconnect', function () {
@@ -40,7 +36,18 @@ io.sockets.on('connection', function (socket) {
 });
 
 
-function getSimilarArtist(socket, body) {
+function similarArtistsAPICall(socket, data, limit){
+	var apiURL = "http://ws.audioscrobbler.com/2.0/?method=artist.getsimilar&autocorrect=1&api_key=97da75badf6d8defc793b60d004c5879&format=json";
+	var url = apiURL+"&limit="+limit+"&artist="+data;
+
+	request(url, function (error, response, body) {
+	   	if (!error && response.statusCode == 200) {
+	   		getSimilarArtist(socket, body, limit, data);
+	   	}
+	});
+}
+
+function getSimilarArtist(socket, body, limit, name) {
 	var info = JSON.parse(body);
 	if(info.hasOwnProperty('error')) 
 	{
@@ -53,25 +60,77 @@ function getSimilarArtist(socket, body) {
 	else if(info.hasOwnProperty('similarartists'))
 	{
 		var similarArtists = info.similarartists.artist;
-		var length = similarArtists.length;
-		//we need to hande length errors too
 
-
-		var returnName = similarArtists[random(0, length-1)].name;
+		var useableArtists = getUsableArtists(socket.id,similarArtists);
+		var length = useableArtists.length;
 		
-		for(var i = 0; i < similarArtists.length; i++)
+		if(useableArtists.length > 0)
 		{
-			previousArtistStorage[socket.id].push(similarArtists[i].name);
+			var returnName = useableArtists[random(0, length-1)];
+			
+			//this could be its own function
+			for(var i = 0; i < similarArtists.length; i++)
+			{
+				previousArtistStorage[socket.id].push(similarArtists[i].name);
+			}
+
+			socket.emit('name', returnName);
+			
+			getTopTracks(socket, returnName);
+
+		}
+		else
+		{
+			if(limit < 90)
+				similarArtistsAPICall(socket, name, limit*2);
+			else
+				socket.emit('error', '5');
 		}
 
-		socket.emit('name', returnName);
-
-		getYoutubeResults(socket, returnName);
 	}
 }
 
-function getYoutubeResults(socket, name) {
-	youtube.feeds.videos( { q: name+' (music)', 'max-results': 3 }, 
+function getUsableArtists(id, artists) {
+	var useable = [];
+	for(var i = 0; i < artists.length; i++ )
+	{
+		if(previousArtistStorage[id].indexOf(artists[i].name) < 0)
+		{
+			useable.push(artists[i].name);
+		}
+	}
+
+	return useable;
+}
+
+function getTopTracks(socket, name) {
+	var apiURL = "http://ws.audioscrobbler.com/2.0/?method=artist.gettoptracks&autocorrect=1&api_key=97da75badf6d8defc793b60d004c5879&format=json";
+	var url = apiURL+"&limit=3&artist="+name;
+
+	request(url, function (error, response, body) {
+	   	if (!error && response.statusCode == 200) {
+	   		var info = JSON.parse(body);
+			if(info.hasOwnProperty('error')) 
+			{
+
+			}
+			else
+			{
+				var topTracks = info.toptracks.track;
+				for(var i = 0; i < topTracks.length; i++)
+				{
+		   			getYoutubeResults(socket, name, topTracks[i].name);
+				}
+			}
+	   	}
+	});
+
+
+}
+
+
+function getYoutubeResults(socket, name, topTrack) {
+	youtube.feeds.videos( { q: name+'  '+topTrack, 'max-results': 1, 'category':'Music' }, 
 		function (err, data) {
 			if( err instanceof Error) {
 				console.log(err);
@@ -83,8 +142,7 @@ function getYoutubeResults(socket, name) {
 					socket.emit('youtubeResult', {'forArtist': name, 'id': data.items[i].id, 'title': data.items[i].title});
 				}
 			}
-		}
-	);
+		});
 }
 
 function random(min, max) {
