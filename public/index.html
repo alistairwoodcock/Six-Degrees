@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="description" content="">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Six Degrees</title>
+	<link rel="stylesheet" href="css/style.css">
+	<link rel="author" href="humans.txt">
+
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.0/jquery.min.js"></script>
+	<script src="/socket.io/socket.io.js"></script>
+	<script>
+		window.onload = function() {
+	  		var artistCount = 0;
+
+	  		var socket = io.connect('http://localhost');
+	  		socket.on('name', function (data) {
+	    		createArtistDisplay(artistCount, data);
+	    		nextArtist(data);
+	  		});
+
+	  		socket.on('youtubeResult', function(data) {
+	  			addYoutubeResults(data);
+	  		});
+
+	  		socket.on('error', function(data) {
+	  			handleError(data);
+	  		});
+
+	  		function handleError(error) {
+	  			console.log(error);
+	  		}
+
+	  		function createArtistDisplay(position, name) {
+	  			console.log(name);
+	  		}
+
+	  		function addYoutubeResults(data) {
+	  			console.log(data);
+	  		}
+
+	  		function nextArtist(data){
+	  			artistCount++;
+	  			if(artistCount < 6)
+		  			socket.emit('query', data);
+		  		else
+		  			socket.emit('sixFound');
+	  		}
+		
+			var previousArtists = [];
+			var artist = "";
+
+			$("#send").click(function (e) {
+				send();
+			});
+
+			$("#search").keypress(function(e) {
+		        if (e.keyCode == 13) {
+		            send();
+		        }
+		    });
+
+			function send(){
+				var text = $("#search").val();
+		        $("#search").val("");
+		        socket.emit('query', text);
+			}
+
+			// not currently using below
+			function beginDegrees(name) {
+				previousArtists = [];
+				console.log("begin: "+name);
+				getSimilarArtist(name, 15, 0);
+			}
+
+			function getSimilarArtist(artistName, lim, count) {
+				var lastfmAPI = "http://ws.audioscrobbler.com/2.0/?method=artist.getsimilar";
+				$.getJSON( lastfmAPI, {
+						api_key: "97da75badf6d8defc793b60d004c5879",
+						autocorrect: "1",
+						artist: artistName,
+						limit: lim,
+						format: "json"
+				}).done(function( data ) {
+					
+					var similarartists = data.similarartists.artist;
+					var useableArtists = [];
+
+
+					var count = Object.keys(similarartists).length;
+					
+					//makes a list of all artists which havent already been retrieved by API
+					for(i = 0; i < count; i++)
+					{
+						if(previousArtists.indexOf(similarartists[i].name) < 0)
+						{
+							useableArtists.push(similarartists[i].name);
+						}
+					}
+					var useableCount = useableArtists.length-1;
+					var randName = "Gorillaz"; //just currently setting a defualt but we can do this better
+					if(useableCount > 0){
+						randName = useableArtists[random(0,useableCount)];
+						console.log("--> "+randName);
+						
+						//add recently recieved artists to list so they wont be used again
+						for(var i = 0; i < count; i++) {
+							previousArtists.push(similarartists[i].name);
+						}
+
+						if(count >= 6)
+						{
+							console.log("end: "+randName);
+							return;
+						}
+						else
+						{
+							console.log("yo");
+							getSimilarArtist(randName, lim, count++);
+						}
+					}
+					else
+					{
+						console.log("Useable artist not found \n Doing a recursive call");
+						getSimilarArtist(artistName, lim*2);
+					}
+
+				}).fail(function( jqxhr, textStatus, error ) {
+					var err = textStatus + ", " + error;
+					console.log( "Request Failed: " + err );
+				});
+			}
+		}
+		function random(min, max) {
+			return Math.floor(Math.random() * (max - min + 1)) + min;
+		}
+
+	</script>
+</head>
+<body>
+	<input id='search' type='textfield'>
+	<input id='send' type='button' value='send'>
+</form>
+</body>
+</html>

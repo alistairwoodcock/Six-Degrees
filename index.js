@@ -1,108 +1,92 @@
 console.log("--- Six Degrees ---");
-
+var express = require('express');
+var bodyParser = require('body-parser');
+var youtube = require('youtube-feeds');
 var request = require('request');
-var syncFor=require('./syncFor');
+var syncFor = require('./syncFor');
 
-var artist = "Jim Guthrie";
-var limit = 15;
-var limIncrementer = 2;
+var port = 3000;
 
-//change this stuff so it just passes in the value
-//not the whole &artist bit
-var apiURL = "http://ws.audioscrobbler.com/2.0/?method=artist.getsimilar&autocorrect=1&api_key=97da75badf6d8defc793b60d004c5879&format=json";
-var apiArtist = "&artist="+artist;
-var apiLimit = "&limit="+limit;
-var req = apiURL+apiArtist+apiLimit;
+var app = express();
+app.use("/", express.static(__dirname+'/public'));
+app.use(bodyParser());
 
-var previousArtists = [];
+var io = require('socket.io').listen(app.listen(port));
 
+var previousArtistStorage = {};
 
-syncFor(0,6,"start",function(i,status,call)
-{
-	if(status === "done")
-		console.log("array iteration is done")
-	else
-		getSimilarArtist(apiArtist, apiLimit, function(){ call('next') })
-})
+io.sockets.on('connection', function (socket) {
+	previousArtistStorage[socket.id] = [];
 
-function getSimilarArtist(apiA, apiL, callback) {
-	limIncrementer = 2;
-	request(apiRequest = apiURL+apiA+apiL, function (error, response, body) {
-		if (!error && response.statusCode == 200) {
-			
-			//TODO: When there is 2 or less artists returned we get some issues
-			//		
-			//		This is going to have a lot of edge cases for returning not enough
-			//		similar artists if the artist is obscure and stuff so think about that too
-			body = JSON.parse(body);
+	socket.on('query', function (data) {
+		
+		var apiURL = "http://ws.audioscrobbler.com/2.0/?method=artist.getsimilar&autocorrect=1&api_key=97da75badf6d8defc793b60d004c5879&format=json";
+		var url = apiURL+"&limit=1&artist="+data;
 
-			var similarartists = body.similarartists.artist;
-			var useableArtists = [];
+		request(url, function (error, response, body) {
+	    	if (!error && response.statusCode == 200) {
+	    		getSimilarArtist(socket, body);
+	    	}
+		});
+	});
+
+	socket.on('disconnect', function () {
+		delete previousArtistStorage[socket.id];
+  	});
+
+  	socket.on('sixFound', function () {
+  		previousArtistStorage[socket.id] = [];
+  	});
+});
 
 
-			var count = Object.keys(body.similarartists.artist).length;
-			console.log("artists returned: "+count);
-
-
-			//makes a list of all artists which havent already been retrieved by API
-			for(i = 0; i < count; i++)
-			{
-				if(previousArtists.indexOf(similarartists[i].name) < 0)
-				{
-					useableArtists.push(similarartists[i].name);
-				}
-			}
-			var useableCount = useableArtists.length-1;
-			console.log(useableCount);
-			var randName = "Gorillaz"; //just currently setting a defualt but we can do this better
-			if(useableCount > 0){
-				randName = useableArtists[random(0,useableCount)];
-				console.log("name used: "+randName);
-			
-			//these both set external values
-			artist = randName;
-			apiArtist = "&artist="+artist;
-
-			//add recently recieved artists to list so they wont be used again
-			for(var i = 0; i < count; i++) {
-				previousArtists.push(similarartists[i].name);
-			}
-
-			callback();
-		}
-		else{
-			console.log("Useable artist not found \n Doing a recursive call");
-			limIncrementer++;
-			getSimilarArtist(apiArtist, "&limit="+limit*limIncrementer, callback);
+function getSimilarArtist(socket, body) {
+	var info = JSON.parse(body);
+	if(info.hasOwnProperty('error')) 
+	{
+		if(info.error == "6")
+		{
+			console.log("Cannot find artist");
+			socket.emit('error', info.error);
 		}
 	}
-})
+	else if(info.hasOwnProperty('similarartists'))
+	{
+		var similarArtists = info.similarartists.artist;
+		var length = similarArtists.length;
+		//we need to hande length errors too
+
+
+		var returnName = similarArtists[random(0, length-1)].name;
+		
+		for(var i = 0; i < similarArtists.length; i++)
+		{
+			previousArtistStorage[socket.id].push(similarArtists[i].name);
+		}
+
+		socket.emit('name', returnName);
+
+		getYoutubeResults(socket, returnName);
+	}
 }
 
+function getYoutubeResults(socket, name) {
+	youtube.feeds.videos( { q: name+' (music)', 'max-results': 3 }, 
+		function (err, data) {
+			if( err instanceof Error) {
+				console.log(err);
+			}
+			else
+			{
+				for(var i = 0; i < data.items.length; i++)
+				{
+					socket.emit('youtubeResult', {'forArtist': name, 'id': data.items[i].id, 'title': data.items[i].title});
+				}
+			}
+		}
+	);
+}
 
 function random(min, max) {
 	return Math.floor(Math.random() * (max - min + 1)) + min;
 }
-
-
-/* calling youtube api */
-
-function handleYoutubeResults(err, data) {
-	if( err instanceof Error) {
-		console.log(err);
-	}
-	else
-	{
-		for(var i = 0; i < data.items.length; i++)
-		{
-			console.log(data.items[i].id)
-			console.log(data.items[i].title)
-		}
-	}
-};
-
-var youtube = require('youtube-feeds');
-youtube.feeds.videos( {
-        q:              'Gorillaz',
-        'max-results':  2,
-    }, handleYoutubeResults)
