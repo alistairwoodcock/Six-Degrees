@@ -8,11 +8,25 @@
 	<link rel="stylesheet" href="css/style.css">
 	<link rel="author" href="humans.txt">
 
+</head>
+<body> 
+	<div id="input">
+		<div id="input-wrap">
+			<input id='search' type='textfield'>
+			<input id='send' type='button' value='send'>
+		</div>
+	</div>
+	<div id="content">
+	</div>
+</form>
+</body>
 	<script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.0/jquery.min.js"></script>
+	<script id="library" src="//oss.maxcdn.com/jquery.velocity/0.0.0/jquery.velocity.min.js"></script>
 	<script src="/socket.io/socket.io.js"></script>
-	<script>
+		<script>
 		window.onload = function() {
 	  		var artistCount = 0;
+	  		$("#input").css('top', 285);
 
 	  		var socket = io.connect('http://localhost');
 	  		socket.on('name', function (data) {
@@ -36,9 +50,10 @@
 
 	  		function createArtistDisplay(position, name) {
 	  			id = creadeID(name);
-	  			$("#content").append("<div id='"+id+"'>"+name+"<ul id='list-"+id+"'></ul></div>");
+	  			$("#content").append("<div class='artist' id='"+id+"'><div id='name-"+id+"'class='artist-name'>"+name+"</div><ol id='list-"+id+"'></ol></div>");
+	  			//$("#name-"+id).hide().fadeIn(500);
 	  		}
-
+	  		
 	  		function addYoutubeResults(data) {
 	  			id = creadeID(data.forArtist);
 	  			$("#list-"+id).append("<li><a href='https://www.youtube.com/watch?v="+data.id+"'>"+data.title+"</a></li>");
@@ -68,11 +83,27 @@
 		    });
 
 			function send(){
+				socket.emit('sixFound');
+				artistCount = 0;
+
+				$("#input").addClass("slide-up");
+				$("#input").css('top', '');
+
 				var text = $("#search").val();
 				
 				$("#content").html("");
 				var id = creadeID(text)
-				$("#content").append("<div id='"+id+"'>"+text+"<ul id='list-"+id+"'></ul></div>");
+				$("#content").append("<div class='artist' id='"+id+"'><div id='name-"+id+"'class='artist-name'>"+text+"</div><ol id='list-"+id+"'></ol></div>");
+	  			$("#name-"+id).velocity(
+				  { 
+				    opacity: 1 
+				  },
+				  { 
+				    display: "block" 
+				  }
+				)
+				artistCount++;
+
 				socket.emit('getYouTube', text);
 		        $("#search").val("");
 		        socket.emit('query', text);
@@ -84,12 +115,4 @@
 		}
 
 	</script>
-</head>
-<body>
-	<input id='search' type='textfield'>
-	<input id='send' type='button' value='send'>
-	<div id="content">
-	</div>
-</form>
-</body>
 </html>

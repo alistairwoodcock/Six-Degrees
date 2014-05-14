@@ -19,7 +19,7 @@ io.sockets.on('connection', function (socket) {
 	previousArtistStorage[socket.id] = [];
 
 	socket.on('query', function (data) {
-		similarArtistsAPICall(socket, data, 30);
+		callAPIForSimilarArtists(socket, data, 30);
 	});
 
 	socket.on('getYouTube', function(data) {
@@ -36,7 +36,7 @@ io.sockets.on('connection', function (socket) {
 });
 
 
-function similarArtistsAPICall(socket, data, limit){
+function callAPIForSimilarArtists(socket, data, limit){
 	var apiURL = "http://ws.audioscrobbler.com/2.0/?method=artist.getsimilar&autocorrect=1&api_key=97da75badf6d8defc793b60d004c5879&format=json";
 	var url = apiURL+"&limit="+limit+"&artist="+data;
 
@@ -53,7 +53,6 @@ function getSimilarArtist(socket, body, limit, name) {
 	{
 		if(info.error == "6")
 		{
-			console.log("Cannot find artist");
 			socket.emit('error', info.error);
 		}
 	}
@@ -71,7 +70,7 @@ function getSimilarArtist(socket, body, limit, name) {
 			//this could be its own function
 			for(var i = 0; i < similarArtists.length; i++)
 			{
-				previousArtistStorage[socket.id].push(similarArtists[i].name);
+				previousArtistStorage[socket.id].push(similarArtists[i].name.toLowerCase());
 			}
 
 			socket.emit('name', returnName);
@@ -82,7 +81,7 @@ function getSimilarArtist(socket, body, limit, name) {
 		else
 		{
 			if(limit < 90)
-				similarArtistsAPICall(socket, name, limit*2);
+				callAPIForSimilarArtists(socket, name, limit*2);
 			else
 				socket.emit('error', '5');
 		}
@@ -94,7 +93,7 @@ function getUsableArtists(id, artists) {
 	var useable = [];
 	for(var i = 0; i < artists.length; i++ )
 	{
-		if(previousArtistStorage[id].indexOf(artists[i].name) < 0)
+		if(previousArtistStorage[id].indexOf(artists[i].name.toLowerCase()) < 0)
 		{
 			useable.push(artists[i].name);
 		}
@@ -114,9 +113,10 @@ function getTopTracks(socket, name) {
 			{
 
 			}
-			else
+			else if(info.hasOwnProperty('toptracks') && info.toptracks.hasOwnProperty('track'))
 			{
 				var topTracks = info.toptracks.track;
+
 				for(var i = 0; i < topTracks.length; i++)
 				{
 		   			getYoutubeResults(socket, name, topTracks[i].name);
@@ -139,7 +139,7 @@ function getYoutubeResults(socket, name, topTrack) {
 			{
 				for(var i = 0; i < data.items.length; i++)
 				{
-					socket.emit('youtubeResult', {'forArtist': name, 'id': data.items[i].id, 'title': data.items[i].title});
+					socket.emit('youtubeResult', {'forArtist': name, 'id': data.items[i].id, 'title': topTrack});
 				}
 			}
 		});
