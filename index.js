@@ -3,8 +3,6 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var youtube = require('youtube-feeds');
 var request = require('request');
-var syncFor = require('./syncFor');
-
 var port = 3000;
 
 var app = express();
