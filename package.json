@@ -1,12 +1,12 @@
 {
-    "name": "Six Degrees",
-    "version": "0.0.0.1",
+    "name": "SixDegrees",
+    "version": "0.0.1",
     "description": "Find new music and See how two artists are musically linked",
     "dependencies": {
-        "socket.io": "latest",
-        "express": "latest",
-        "youtube-feeds": "latest",
-        "body-parser" : "lastest"
+        "socket.io": "0.9.16",
+        "express": "3.x",
+        "youtube-feeds": "2.2.1",
+        "body-parser" : "1.2.0"
     },
     "author": "Alistair W"
 }
