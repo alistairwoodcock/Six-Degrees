@@ -61,7 +61,7 @@
 
 	  		function nextArtist(data){
 	  			artistCount++;
-	  			if(artistCount < 6)
+	  			if(artistCount < 7)
 		  			socket.emit('query', data);
 		  		else{
 		  			socket.emit('sixFound');
